@@ -1,0 +1,606 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <title>Video Chat | E-Bundle Ethiopia</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: "#4F46E5",
+              secondary: "#7C3AED",
+              dark: "#0f172a",
+            },
+          },
+        },
+      };
+    </script>
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+      rel="stylesheet" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet" />
+    <style>
+      body {
+        background: #000;
+        font-family: "Inter", sans-serif;
+        overflow: hidden;
+      }
+      .glass {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .video-stage {
+        position: fixed;
+        inset: 0;
+        background: #000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+      }
+      .video-stage video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      .local-pip {
+        position: fixed;
+        bottom: 120px;
+        right: 20px;
+        width: 130px;
+        height: 200px;
+        background: #1e1b4b;
+        border-radius: 20px;
+        overflow: hidden;
+        z-index: 40;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+        border: 2px solid rgba(255, 255, 255, 0.2);
+        cursor: move;
+        transition: transform 0.3s ease;
+      }
+      .remote-participants {
+        display: none; /* Hide thumbnails as per user request */
+      }
+      .controls {
+        position: fixed;
+        bottom: 30px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(20px);
+        padding: 12px 30px;
+        border-radius: 40px;
+        display: flex;
+        gap: 20px;
+        z-index: 50;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .control-btn {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        color: white;
+        background: rgba(255, 255, 255, 0.1);
+        transition: all 0.3s ease;
+      }
+      .control-btn:hover {
+        background: rgba(255, 255, 255, 0.2);
+        transform: scale(1.1);
+      }
+      .control-btn.active {
+        background: #ef4444;
+      }
+      .control-btn.end {
+        background: #ef4444;
+        width: 60px;
+        border-radius: 30px;
+      }
+      .waiting-overlay {
+        position: fixed;
+        inset: 0;
+        background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+      }
+      .spinner {
+        width: 64px;
+        height: 64px;
+        border: 4px solid rgba(255, 255, 255, 0.1);
+        border-top-color: #4f46e5;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      .toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 12px 24px;
+        border-radius: 12px;
+        color: white;
+        z-index: 200;
+        transform: translateX(400px);
+        transition: transform 0.3s ease;
+      }
+      .toast.show { transform: translateX(0); }
+      .toast.success { background: #10b981; }
+      .toast.error { background: #ef4444; }
+      .toast.info { background: #3b82f6; }
+    </style>
+  </head>
+  <body class="antialiased min-h-screen relative">
+    <!-- Navigation -->
+    <!-- Navigation Overlay -->
+    <nav class="fixed top-0 left-0 right-0 z-[100] glass px-6 py-4 flex justify-between items-center border-b border-white/5">
+      <div class="flex items-center space-x-3 cursor-pointer" onclick="window.location.href = 'dashboard.html'">
+        <div class="w-10 h-10 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center">
+          <i class="fas fa-graduation-cap text-white text-lg"></i>
+        </div>
+        <span class="text-xl font-bold text-white">E-Bundle</span>
+      </div>
+      <div class="hidden md:flex items-center space-x-1">
+        <a href="dashboard.html" class="px-4 py-2 rounded-lg text-gray-300 hover:text-white transition-all">Dashboard</a>
+        <a href="library.html" class="px-4 py-2 rounded-lg text-gray-300 hover:text-white transition-all">Library</a>
+        <a href="ai-tutor.html" class="px-4 py-2 rounded-lg text-gray-300 hover:text-white transition-all">AI Tutor</a>
+        <a href="community.html" class="px-4 py-2 rounded-lg text-gray-300 hover:text-white transition-all">Community</a>
+        <a href="kahoot.html" class="px-4 py-2 rounded-lg text-gray-300 hover:text-white transition-all">Kahoot</a>
+        <a href="video-chat.html" class="px-4 py-2 rounded-lg text-white bg-white/10">Video Chat</a>
+      </div>
+      <button id="mobileMenuBtn" class="md:hidden w-10 h-10 text-white" onclick="toggleMobileMenu()">
+        <i class="fas fa-bars"></i>
+      </button>
+    </nav>
+    <div
+      id="mobileMenu"
+      class="md:hidden hidden glass border-b border-white/10 px-4 py-3 space-y-2 relative z-40">
+      <a href="dashboard.html" class="block px-3 py-2 rounded-lg hover:bg-white/10">Dashboard</a>
+      <a href="library.html" class="block px-3 py-2 rounded-lg hover:bg-white/10">Library</a>
+      <a href="ai-tutor.html" class="block px-3 py-2 rounded-lg hover:bg-white/10">AI Tutor</a>
+      <a href="community.html" class="block px-3 py-2 rounded-lg hover:bg-white/10">Community</a>
+      <a href="kahoot.html" class="block px-3 py-2 rounded-lg hover:bg-white/10">Kahoot</a>
+      <a href="video-chat.html" class="block px-3 py-2 rounded-lg bg-white/10">Video Chat</a>
+    </div>
+
+    <!-- Main Content -->
+    <main class="relative h-[calc(100vh-5rem)]">
+      <!-- Video Stage (Main focus) -->
+      <div id="videoStage" class="video-stage">
+        <video id="stageVideo" autoplay playsinline class="object-cover"></video>
+        <div id="stageUserInfo" class="absolute bottom-32 left-8 bg-black/40 backdrop-blur-md px-4 py-2 rounded-xl text-white">
+          <p id="stageName" class="font-bold">Waiting for participants...</p>
+          <p id="stageGrade" class="text-xs text-gray-300"></p>
+        </div>
+      </div>
+
+      <!-- Remote Participants Row -->
+      <div id="remoteGrid" class="remote-participants">
+        <!-- Remote videos will be appended here -->
+      </div>
+
+      <!-- Local Video PIP -->
+      <div id="localPip" class="local-pip">
+        <video id="localVideo" autoplay playsinline muted></video>
+        <div class="participant-info">You</div>
+      </div>
+
+      <!-- Waiting Screen -->
+      <div id="waitingScreen" class="waiting-overlay">
+        <div class="text-center space-y-6 max-w-md px-4">
+          <div class="w-24 h-24 relative mx-auto">
+            <div class="absolute inset-0 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+            <i class="fas fa-video text-4xl text-primary absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"></i>
+          </div>
+          <div>
+            <h2 class="text-2xl font-bold mb-2">Group Study Session</h2>
+            <p class="text-gray-400">Connect with up to 20 students for a collaborative group session</p>
+          </div>
+          <div class="space-y-4 w-full">
+            <button onclick="videoChat.createRoom()" class="w-full px-8 py-3 bg-gradient-to-r from-primary to-secondary rounded-xl font-bold hover:scale-105 transition-all shadow-lg flex justify-center items-center">
+              <i class="fas fa-plus-circle mr-2"></i> Create Session (Get PIN)
+            </button>
+            <div class="relative flex items-center justify-center my-4">
+              <hr class="w-full border-white/20">
+              <span class="absolute bg-[#0f172a] px-2 text-sm text-gray-400">OR JOIN</span>
+            </div>
+            <div class="flex gap-2">
+              <input type="text" id="pinInput" placeholder="Enter PIN" maxlength="6" class="flex-1 px-4 py-2 bg-white/10 border border-white/20 rounded-xl text-white text-center tracking-widest font-mono text-lg" />
+              <button onclick="videoChat.joinRoom()" class="px-6 py-2 glass rounded-xl hover:bg-white/10 transition-all font-semibold">Join</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Host Waiting Screen -->
+      <div id="hostWaitingScreen" class="waiting-overlay hidden">
+        <div class="text-center space-y-6 max-w-md px-4 glass-card p-8 rounded-2xl mx-4">
+          <h3 class="text-2xl font-bold text-white">Room PIN</h3>
+          <div class="bg-black/30 py-4 px-8 rounded-xl border border-white/10 inline-block">
+            <span id="displayPin" class="text-5xl font-mono tracking-widest text-primary font-bold">------</span>
+          </div>
+          <p class="text-gray-300">Invite others with this PIN</p>
+          <div class="spinner mx-auto"></div>
+          <button onclick="videoChat.cancelCreate()" class="w-full px-6 py-3 bg-red-500/20 text-red-400 rounded-xl hover:bg-red-500/30 transition-all border border-red-500/30">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div id="controls" class="controls hidden">
+        <button onclick="videoChat.toggleMute()" id="muteBtn" class="control-btn"><i class="fas fa-microphone"></i></button>
+        <button onclick="videoChat.toggleVideo()" id="videoBtn" class="control-btn"><i class="fas fa-video"></i></button>
+        <button onclick="videoChat.toggleScreenShare()" id="screenBtn" class="control-btn"><i class="fas fa-desktop"></i></button>
+        <button onclick="videoChat.endCall()" class="control-btn end"><i class="fas fa-phone-slash"></i></button>
+      </div>
+    </main>
+
+    <!-- Toast Container -->
+    <div id="toastContainer"></div>
+
+    <!-- Socket.io -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
+    <script>
+      const videoChat = {
+        socket: null,
+        localStream: null,
+        peerConnections: {}, 
+        remoteStreams: {}, 
+        participants: {}, 
+        currentStageId: null,
+        room: null,
+        isMuted: false,
+        isVideoOff: false,
+        userData: null,
+
+        iceServers: {
+          iceServers: [
+            { urls: "stun:stun.l.google.com:19302" },
+            { urls: "stun:stun1.l.google.com:19302" },
+            { urls: "stun:stun2.l.google.com:19302" },
+          ],
+        },
+
+        init: async () => {
+          const token = localStorage.getItem("token");
+          if (!token) {
+            videoChat.showToast("Please login first", "error");
+            setTimeout(() => (window.location.href = "login.html"), 2000);
+            return;
+          }
+
+          try {
+            const storedUser = localStorage.getItem("user");
+            if (storedUser) videoChat.userData = JSON.parse(storedUser);
+          } catch (e) {
+            videoChat.userData = { firstName: "Student", grade: "?" };
+          }
+
+          videoChat.connectSocket();
+          videoChat.setupLocalDrag();
+        },
+
+        setupLocalDrag: () => {
+          const pip = document.getElementById("localPip");
+          let isDragging = false;
+          let offset = [0, 0];
+
+          pip.addEventListener("mousedown", (e) => {
+            isDragging = true;
+            offset = [pip.offsetLeft - e.clientX, pip.offsetTop - e.clientY];
+          });
+
+          document.addEventListener("mouseup", () => (isDragging = false));
+          document.addEventListener("mousemove", (e) => {
+            if (isDragging) {
+              pip.style.left = e.clientX + offset[0] + "px";
+              pip.style.top = e.clientY + offset[1] + "px";
+              pip.style.bottom = "auto";
+              pip.style.right = "auto";
+            }
+          });
+        },
+
+        connectSocket: () => {
+          const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+          const serverUrl = isLocal ? "http://localhost:5000" : "https://e-bundle.onrender.com";
+
+          videoChat.socket = io(serverUrl, { transports: ["websocket"] });
+
+          videoChat.socket.on("connect", () => {
+            console.log("Socket connected:", videoChat.socket.id);
+            videoChat.socket.emit("register", {
+              userId: videoChat.userData?._id || "anonymous",
+              name: videoChat.userData?.firstName || "Student",
+              grade: videoChat.userData?.grade || "?",
+            });
+          });
+
+          videoChat.socket.on("room-created", (data) => {
+            document.getElementById("displayPin").textContent = data.pin;
+            videoChat.room = data.pin;
+          });
+
+          videoChat.socket.on("room-joined", (data) => {
+            console.log("Joined room:", data.pin, "Existing participants:", data.participants.length);
+            videoChat.room = data.pin;
+            document.getElementById("waitingScreen").classList.add("hidden");
+            document.getElementById("controls").classList.remove("hidden");
+            
+            data.participants.forEach(p => {
+              videoChat.participants[p.socketId] = p;
+              videoChat.initiateCall(p.socketId);
+            });
+          });
+
+          videoChat.socket.on("user-joined", (user) => {
+            console.log("New user joined room:", user.name);
+            videoChat.participants[user.socketId] = user;
+            videoChat.showToast(`${user.name} joined. Establishing connection...`, "info");
+          });
+
+          videoChat.socket.on("user-left", (data) => {
+            console.log("User left:", data.socketId);
+            videoChat.handleUserLeft(data.socketId);
+          });
+
+          videoChat.socket.on("offer", async (data) => {
+            console.log("Received offer from:", data.from);
+            await videoChat.handleOffer(data.offer, data.from, data.fromUser);
+          });
+
+          videoChat.socket.on("answer", async (data) => {
+            console.log("Received answer from:", data.from);
+            await videoChat.handleAnswer(data.answer, data.from);
+          });
+
+          videoChat.socket.on("ice-candidate", async (data) => {
+            await videoChat.handleIceCandidate(data.candidate, data.from);
+          });
+
+          videoChat.socket.on("room-error", (msg) => {
+            videoChat.showToast(msg, "error");
+            videoChat.cleanup();
+          });
+        },
+
+        getMedia: async () => {
+          try {
+            if (!videoChat.localStream) {
+              videoChat.localStream = await navigator.mediaDevices.getUserMedia({
+                video: { width: 1280, height: 720 },
+                audio: true,
+              });
+              document.getElementById("localVideo").srcObject = videoChat.localStream;
+            }
+            return true;
+          } catch (err) {
+            console.error("Media error:", err);
+            videoChat.showToast("Camera access denied", "error");
+            return false;
+          }
+        },
+
+        createPeerConnection: (socketId) => {
+          console.log("Creating PeerConnection for:", socketId);
+          const pc = new RTCPeerConnection(videoChat.iceServers);
+
+          pc.onicecandidate = (e) => {
+            if (e.candidate) {
+              videoChat.socket.emit("ice-candidate", {
+                target: socketId,
+                candidate: e.candidate,
+              });
+            }
+          };
+
+          pc.ontrack = (e) => {
+            console.log("Received remote track from:", socketId);
+            if (e.streams && e.streams[0]) {
+              videoChat.remoteStreams[socketId] = e.streams[0];
+              videoChat.addParticipantUI(socketId, e.streams[0]);
+              // Force switch if it's the only one or if stage is empty
+              if (!videoChat.currentStageId || Object.keys(videoChat.remoteStreams).length === 1) {
+                videoChat.switchStage(socketId);
+              }
+            }
+          };
+
+          pc.onconnectionstatechange = () => {
+            console.log(`Connection state with ${socketId}:`, pc.connectionState);
+            if (pc.connectionState === "failed") {
+              videoChat.showToast("Connection failed. Retrying...", "error");
+            }
+          };
+
+          if (videoChat.localStream) {
+            videoChat.localStream.getTracks().forEach(t => pc.addTrack(t, videoChat.localStream));
+          }
+
+          videoChat.peerConnections[socketId] = pc;
+          return pc;
+        },
+
+        initiateCall: async (socketId) => {
+          await videoChat.getMedia();
+          const pc = videoChat.createPeerConnection(socketId);
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          
+          videoChat.socket.emit("offer", {
+            target: socketId,
+            offer: offer,
+            fromUser: {
+              name: videoChat.userData?.firstName || "Student",
+              grade: videoChat.userData?.grade || "?",
+            }
+          });
+        },
+
+        handleOffer: async (offer, fromId, fromUser) => {
+          videoChat.participants[fromId] = fromUser;
+          await videoChat.getMedia();
+          
+          const pc = videoChat.createPeerConnection(fromId);
+          await pc.setRemoteDescription(new RTCSessionDescription(offer));
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          
+          videoChat.socket.emit("answer", {
+            target: fromId,
+            answer: answer
+          });
+          
+          // Show controls for host
+          document.getElementById("hostWaitingScreen").classList.add("hidden");
+          document.getElementById("controls").classList.remove("hidden");
+        },
+
+        handleAnswer: async (answer, fromId) => {
+          const pc = videoChat.peerConnections[fromId];
+          if (pc) {
+            await pc.setRemoteDescription(new RTCSessionDescription(answer));
+          }
+        },
+
+        handleIceCandidate: async (candidate, fromId) => {
+          const pc = videoChat.peerConnections[fromId];
+          if (pc) {
+            try {
+              await pc.addIceCandidate(new RTCIceCandidate(candidate));
+            } catch (e) {
+              console.error("Error adding ice candidate:", e);
+            }
+          }
+        },
+
+        addParticipantUI: (socketId, stream) => {
+          // Store stream reference
+          videoChat.remoteStreams[socketId] = stream;
+          // In 1:1, we just switch the stage
+          videoChat.switchStage(socketId);
+        },
+
+        switchStage: (socketId) => {
+          console.log("Switching stage to:", socketId);
+          const stageVideo = document.getElementById("stageVideo");
+          const stream = videoChat.remoteStreams[socketId];
+          const user = videoChat.participants[socketId] || { name: "Participant", grade: "?" };
+          
+          if (stream) {
+            stageVideo.srcObject = stream;
+            videoChat.currentStageId = socketId;
+            document.getElementById("stageName").textContent = user.name;
+            document.getElementById("stageGrade").textContent = `Grade ${user.grade}`;
+            
+            // Highlight active if grid existed
+            document.querySelectorAll(".participant-card").forEach(c => c.classList.remove("active"));
+            const card = document.getElementById(`participant-${socketId}`);
+            if (card) card.classList.add("active");
+          }
+        },
+
+        handleUserLeft: (socketId) => {
+          if (videoChat.peerConnections[socketId]) {
+            videoChat.peerConnections[socketId].close();
+            delete videoChat.peerConnections[socketId];
+          }
+          delete videoChat.remoteStreams[socketId];
+          delete videoChat.participants[socketId];
+          
+          if (videoChat.currentStageId === socketId) {
+            videoChat.currentStageId = null;
+            const remaining = Object.keys(videoChat.remoteStreams);
+            if (remaining.length > 0) {
+              videoChat.switchStage(remaining[0]);
+            } else {
+              document.getElementById("stageVideo").srcObject = null;
+              document.getElementById("stageName").textContent = "Waiting for participants...";
+              document.getElementById("stageGrade").textContent = "";
+            }
+          }
+        },
+
+        createRoom: async () => {
+          const success = await videoChat.getMedia();
+          if (!success) return;
+          
+          document.getElementById("waitingScreen").classList.add("hidden");
+          document.getElementById("hostWaitingScreen").classList.remove("hidden");
+          videoChat.socket.emit("create-room", {
+            userId: videoChat.userData?._id || "anonymous",
+            name: videoChat.userData?.firstName || "Student",
+            grade: videoChat.userData?.grade || "?",
+          });
+        },
+
+        joinRoom: async () => {
+          const pin = document.getElementById("pinInput").value.trim();
+          if (pin.length !== 6) return videoChat.showToast("Invalid PIN", "error");
+          
+          const success = await videoChat.getMedia();
+          if (!success) return;
+          
+          videoChat.socket.emit("join-room", pin);
+        },
+
+        toggleMute: () => {
+          if (videoChat.localStream) {
+            videoChat.isMuted = !videoChat.isMuted;
+            videoChat.localStream.getAudioTracks().forEach(t => t.enabled = !videoChat.isMuted);
+            document.getElementById("muteBtn").classList.toggle("active", videoChat.isMuted);
+            document.getElementById("muteBtn").innerHTML = videoChat.isMuted ? 
+              '<i class="fas fa-microphone-slash"></i>' : '<i class="fas fa-microphone"></i>';
+          }
+        },
+
+        toggleVideo: () => {
+          if (videoChat.localStream) {
+            videoChat.isVideoOff = !videoChat.isVideoOff;
+            videoChat.localStream.getVideoTracks().forEach(t => t.enabled = !videoChat.isVideoOff);
+            document.getElementById("videoBtn").classList.toggle("active", videoChat.isVideoOff);
+            document.getElementById("videoBtn").innerHTML = videoChat.isVideoOff ? 
+              '<i class="fas fa-video-slash"></i>' : '<i class="fas fa-video"></i>';
+          }
+        },
+
+        endCall: () => {
+          window.location.reload();
+        },
+
+        cleanup: () => {
+          Object.values(videoChat.peerConnections).forEach(pc => pc.close());
+          videoChat.peerConnections = {};
+          if (videoChat.localStream) videoChat.localStream.getTracks().forEach(t => t.stop());
+          window.location.reload();
+        },
+
+        showToast: (msg, type) => {
+          const toast = document.createElement("div");
+          toast.className = `toast ${type} show`;
+          toast.textContent = msg;
+          document.getElementById("toastContainer").appendChild(toast);
+          setTimeout(() => {
+            toast.classList.remove("show");
+            setTimeout(() => toast.remove(), 300);
+          }, 3000);
+        }
+      };
+
+      document.addEventListener("DOMContentLoaded", () => videoChat.init());
+    </script>
+  </body>
+</html>
